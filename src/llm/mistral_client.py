@@ -15,6 +15,6 @@ def get_mistral_chat_model():
         model=OLLAMA_MODEL,
         base_url=OLLAMA_BASE_URL,
         temperature=OLLAMA_TEMPERATURE,
-        num_ctx=8192,
+        num_ctx=4096,
         keep_alive="10m",
     )

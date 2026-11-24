@@ -19,6 +19,15 @@ Rules:
 - Confidence is your confidence in the finding, not proof of exploitability.
 - Do not rewrite the whole program unless the input explicitly asks for it.
 
+
+CONFIDENCE SCORE RULES:
+- Confidence must be a decimal number between 0.0 and 1.0.
+- Never return confidence as a percentage between 0 and 100.
+- For example, use 0.90 instead of 90.
+- Use 0.85 instead of 85.
+- Use 0.75 instead of 75.
+
+
 Review focus: {review_focus}
 Programming language: {language}
 """
