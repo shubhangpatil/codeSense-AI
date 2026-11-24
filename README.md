@@ -120,11 +120,10 @@ sequenceDiagram
 Confidence values are normalized to the interval $[0,1]$:
 
 $$
-c_{\text{normalized}}
-=
+c_{\mathrm{normalized}} =
 \begin{cases}
-\frac{c}{100}, & 1 < c \leq 100 \\[6pt]
-c, & 0 \leq c \leq 1
+\dfrac{c}{100}, & 1 < c \leq 100, \\[4pt]
+c, & 0 \leq c \leq 1.
 \end{cases}
 $$
 
