@@ -9,12 +9,13 @@ from config.settings import (
 
 
 def get_mistral_chat_model():
-    """Initialize Ministral 3B locally through Ollama."""
+    """Initialize Ministral locally through Ollama."""
 
     return ChatOllama(
         model=OLLAMA_MODEL,
         base_url=OLLAMA_BASE_URL,
         temperature=OLLAMA_TEMPERATURE,
         num_ctx=4096,
+        num_predict=1200,
         keep_alive="10m",
     )

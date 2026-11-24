@@ -1,77 +1,100 @@
-from langchain_core.runnables import RunnableBranch, RunnableLambda, RunnableParallel
+
+from langchain_core.runnables import RunnableBranch
+
 from src.chains.review_chain import build_review_chain
-from src.schemas.review_schema import ReviewResult
-
-
-def _combine_parallel_results(results: dict) -> ReviewResult:
-    findings = []
-    positives = []
-    limitations = []
-    summaries = []
-
-    for name, result in results.items():
-        if not isinstance(result, ReviewResult):
-            result = ReviewResult.model_validate(result)
-        summaries.append(f"{name.title()}: {result.overall_summary}")
-        findings.extend(result.findings)
-        positives.extend(result.positive_observations)
-        limitations.extend(result.limitations)
-
-    # Remove exact duplicate findings while preserving order.
-    unique = []
-    seen = set()
-    for finding in findings:
-        key = (
-            finding.issue_title.strip().lower(),
-            finding.line_number,
-            finding.category,
-        )
-        if key not in seen:
-            seen.add(key)
-            unique.append(finding)
-
-    return ReviewResult(
-        review_type="full",
-        overall_summary=" ".join(summaries),
-        findings=unique,
-        positive_observations=list(dict.fromkeys(positives)),
-        limitations=list(dict.fromkeys(limitations)),
-    )
 
 
 def build_review_orchestrator():
-    """Route a request to one focused chain or all four chains in parallel."""
-    bug_chain = build_review_chain(
-        "Bug and correctness review: logical errors, runtime exceptions, "
-        "boundary conditions, and input validation."
-    )
-    security_chain = build_review_chain(
-        "Security review: hardcoded secrets, unsafe operations, injection risks, "
-        "and insecure patterns. Report only evidence visible in the code."
-    )
-    performance_chain = build_review_chain(
-        "Performance review: inefficient algorithms, unnecessary work, "
-        "memory use, and avoidable computations."
-    )
-    quality_chain = build_review_chain(
-        "Code quality review: readability, naming, maintainability, structure, "
-        "documentation, and best practices."
+    """
+    Build review chains.
+
+    Full review uses ONE LLM request for all four review areas.
+    Focused reviews use one LLM request for the selected area.
+    """
+
+    bugs_chain = build_review_chain(
+        """
+        Focus only on bugs and correctness:
+        - Logical errors
+        - Runtime exceptions
+        - Boundary conditions
+        - Incorrect calculations
+        - Missing input validation
+        """
     )
 
-    full_parallel = (
-        RunnableParallel(
-            bugs=bug_chain,
-            security=security_chain,
-            performance=performance_chain,
-            quality=quality_chain,
-        )
-        | RunnableLambda(_combine_parallel_results)
+    security_chain = build_review_chain(
+        """
+        Focus only on security:
+        - Hardcoded credentials and secrets
+        - SQL injection
+        - Command injection
+        - Unsafe deserialization
+        - Insecure operations
+        Report only vulnerabilities supported by the code.
+        """
+    )
+
+    performance_chain = build_review_chain(
+        """
+        Focus only on performance:
+        - Inefficient algorithms
+        - Unnecessary loops and computations
+        - Memory inefficiency
+        - Repeated operations
+        - Avoidable delays
+        """
+    )
+
+    quality_chain = build_review_chain(
+        """
+        Focus only on code quality:
+        - Readability
+        - Naming conventions
+        - Maintainability
+        - Code organization
+        - Documentation
+        - Best practices
+        """
+    )
+
+    # All four areas are reviewed in ONE model invocation.
+    full_chain = build_review_chain(
+        """
+        Perform a complete Python code review covering all four areas:
+
+        1. BUGS AND CORRECTNESS
+           Find logical errors, runtime exceptions, boundary conditions,
+           incorrect calculations, and missing input validation.
+
+        2. SECURITY
+           Find hardcoded credentials, injection risks, unsafe operations,
+           insecure deserialization, and other vulnerabilities.
+
+        3. PERFORMANCE
+           Find inefficient algorithms, unnecessary computations,
+           excessive memory usage, and avoidable operations.
+
+        4. CODE QUALITY
+           Find readability, maintainability, naming, documentation,
+           and structural problems.
+
+        IMPORTANT RULES:
+        - Review all four areas in this single review.
+        - Report only actionable findings.
+        - Do not invent vulnerabilities or bugs.
+        - Do not invent line numbers.
+        - Use null for line_number when uncertain.
+        - Avoid duplicate findings.
+        - Keep descriptions and suggested fixes concise.
+        - If no issues are found in an area, do not invent one.
+        """
     )
 
     return RunnableBranch(
-        (lambda x: x.get("review_type") == "bugs", bug_chain),
+        (lambda x: x.get("review_type") == "bugs", bugs_chain),
         (lambda x: x.get("review_type") == "security", security_chain),
         (lambda x: x.get("review_type") == "performance", performance_chain),
         (lambda x: x.get("review_type") == "quality", quality_chain),
-        full_parallel,
+        full_chain,
     )
